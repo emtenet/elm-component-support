@@ -3,6 +3,37 @@ module Component.App exposing (program, beginnerProgram)
 {-| These functions help you define a `main` value as required by all Elm applications.
 
 @docs program, beginnerProgram
+
+# Wrap program in some `Html`
+
+If you want to wrap your top level component in some `Html` with out
+introducing a new component then try something like this:
+
+    import Html exposing (Html)
+    import Html.Attributes
+    import Component.App
+    import CounterList
+
+    main =
+        Component.App.beginnerProgram
+            { init = CounterList.init
+            , view = view
+            , update = CounterList.update
+            }
+
+
+    view : (CounterList.Msg -> msg) -> CounterList.Model -> Html msg
+    view tag model =
+        Html.div [ style ] [ CounterList.view tag model ]
+
+
+    style : Html.Attribute msg
+    style =
+        Html.Attributes.style
+            [ ( "maxWidth", "300px" )
+            , ( "margin", "0px auto" )
+            ]
+
 -}
 
 import Html exposing (Html)
