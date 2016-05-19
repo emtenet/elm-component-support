@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "0.1.0",
     "summary": "Support for building applications from Elm components,",
     "repository": "http://github.com/emtenet/elm-component-support.git",
     "license": "BSD3",

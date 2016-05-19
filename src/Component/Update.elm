@@ -7,8 +7,6 @@ module Component.Update
         , event
         , eventIgnored
         , model
-        , modelAndCmd
-        , modelAndMsg
         , modelAndEvent
         , component
         , components
@@ -17,9 +15,15 @@ module Component.Update
 
 {-| Building blocks for writing component update functions.
 
+# Update functions
+
 Component update functions have the following type signature:
 
-update : Msg -> Model -> Component.Update.Action Msg Model
+    import Component.Update as Update
+
+    update : Msg -> Model -> Update.Action Msg Model
+
+# Update actions
 
 Component update functions, on receipt of a message, can do a combination of:
 
@@ -30,18 +34,15 @@ Component update functions, on receipt of a message, can do a combination of:
     * Inject an additional message (`msg`) through the update function, or
     * **ignore** the message.
 
-These **actions** are performed by returning the appropriate `Update.Action`
-from the update function.
-
 @docs Action
 
 # Simple actions
 
-@docs ignore, model, cmd, msg, event, eventIgnored
+@docs ignore, model, event, eventIgnored, cmd, msg
 
 # Combinations of actions
 
-@docs modelAndCmd, modelAndMsg, modelAndEvent
+@docs modelAndEvent
 
 # Child components
 
@@ -53,13 +54,9 @@ events back into your update function.
 
 # Application support
 
-The following `program` function is used by `Component.App` and should not need
-to be called directly.
-
 @docs program
 
 -}
-
 
 -- ACTION
 
@@ -152,7 +149,7 @@ event =
 
 
 {-| Used to document that the message was an event intended for the parent
-component, but the parent component did not process the message and passed 
+component, but the parent component did not process the message and passed
 it back to your component.
 
 See above example for `event`.
@@ -174,16 +171,10 @@ model =
     Model
 
 
-modelAndCmd : model -> Cmd.Cmd msg -> Action msg model
-modelAndCmd =
-    ModelAndCmd
+{-| Update the model and return an event to the parent component.
 
-
-modelAndMsg : model -> msg -> Action msg model
-modelAndMsg =
-    ModelAndMsg
-
-
+See `model` and `event` for usage suggestions.
+-}
 modelAndEvent : model -> msg -> Action msg model
 modelAndEvent =
     ModelAndEvent
@@ -193,6 +184,29 @@ modelAndEvent =
 -- COMPONENT
 
 
+{-| Forward messages to a child component.
+
+    import Counter
+    import Component.Update as Update
+
+    type Msg
+        = Top Counter.Msg
+        | Bottom Counter.Msg
+
+    type alias Model =
+        { top : Counter.Model
+        , bottom : Counter.Model
+        }
+
+    update : Msg -> Model -> Update.Action Msg Model
+    update msg' model =
+        case msg' of
+            Top msg ->
+                Update.component msg model.top (Top) (\x -> { model | top = x }) Counter.update
+
+            Bottom msg ->
+                Update.component msg model.bottom (Bottom) (\x -> { model | bottom = x }) Counter.update
+-}
 component :
     msg
     -> model
@@ -205,12 +219,12 @@ component msg model tag wrap update =
 
 
 componentFold :
-    msg 
-    -> model 
+    msg
+    -> model
     -> Bool
     -> (msg -> msg')
-    -> (model -> model') 
-    -> (msg -> model -> Action msg model) 
+    -> (model -> model')
+    -> (msg -> model -> Action msg model)
     -> Action msg' model'
 componentFold msg model updated tag wrap update =
     case update msg model of
@@ -252,6 +266,23 @@ componentFold msg model updated tag wrap update =
 -- LIST OF COMPONENTS
 
 
+{-| Forward messages to a list of child components.
+
+    import Counter
+    import Component.Update as Update
+
+    type Msg = Counter Int Counter.Msg
+
+    type alias Model =
+        { counters : List ( Int, Counter.Model )
+        }
+
+    update : Msg -> Model -> Update.Action Msg Model
+    update msg' model =
+        case msg' of
+            Counter id msg ->
+                Update.components id msg model.counters (Counter id) (\x -> { model | counters = x }) Counter.update
+-}
 components :
     id
     -> msg
@@ -261,82 +292,89 @@ components :
     -> (msg -> model -> Action msg model)
     -> Action msg' model'
 components id msg models tag wrap update =
-  case componentFindById id models of
-    Nothing ->
-      Ignore
+    case componentFindById id models of
+        Nothing ->
+            Ignore
 
-    Just model ->
-      let
-        wrap' = wrap << componentReplaceById id models
-      in
-        componentFold msg model False tag wrap' update
+        Just model ->
+            let
+                wrap' =
+                    wrap << componentReplaceById id models
+            in
+                componentFold msg model False tag wrap' update
 
 
-componentFindById : id -> List (id, model) -> Maybe model
+componentFindById : id -> List ( id, model ) -> Maybe model
 componentFindById id models =
-  let
-    find (id', _) = (id' == id)
-  in
-    case List.filter find models of
-      [ (_, model) ] ->
-        Just model
-      _ ->
-        Nothing
+    let
+        find ( id', _ ) =
+            (id' == id)
+    in
+        case List.filter find models of
+            [ ( _, model ) ] ->
+                Just model
+
+            _ ->
+                Nothing
 
 
-componentReplaceById : id -> List (id, model) -> model -> List (id, model)
+componentReplaceById : id -> List ( id, model ) -> model -> List ( id, model )
 componentReplaceById id models with =
-  let
-    replace model =
-      if id == fst model then 
-        (id, with)
-      else
-        model
-  in
-    List.map replace models
+    let
+        replace model =
+            if id == fst model then
+                ( id, with )
+            else
+                model
+    in
+        List.map replace models
+
 
 
 -- APPLICATION SUPPORT
 
 
+{-| Utility function used by `Component.App.program` to convert a top level
+component update function to one suitable for `Html.App.program`.
+-}
 program :
     (msg -> model -> Action msg model)
     -> msg
     -> model
     -> ( model, Cmd msg )
 program update msg model =
-  programFold msg model update
+    programFold msg model update
 
 
 programFold :
-    msg 
-    -> model 
-    -> (msg -> model -> Action msg model) 
+    msg
+    -> model
+    -> (msg -> model -> Action msg model)
     -> ( model, Cmd msg )
 programFold msg model update =
-  case update msg model of
-    Ignore ->
-      ( model, Cmd.none )
+    case update msg model of
+        Ignore ->
+            ( model, Cmd.none )
 
-    Cmd cmd ->
-      ( model, cmd )
+        Cmd cmd ->
+            ( model, cmd )
 
-    Msg msg' ->
-      programFold msg' model update
+        Msg msg' ->
+            programFold msg' model update
 
-    Event msg' ->
-      -- no one to notify, ignore instead
-      ( model, Cmd.none )
+        Event msg' ->
+            -- no one to notify, ignore instead
+            ( model, Cmd.none )
 
-    Model model' ->
-      ( model', Cmd.none )
+        Model model' ->
+            ( model', Cmd.none )
 
-    ModelAndCmd model' cmd ->
-      ( model', cmd )
+        ModelAndCmd model' cmd ->
+            ( model', cmd )
 
-    ModelAndMsg model' msg' ->
-      programFold msg' model' update
+        ModelAndMsg model' msg' ->
+            programFold msg' model' update
 
-    ModelAndEvent model' msg' ->
-      -- no one to notify, ignore instead
-      ( model', Cmd.none )
+        ModelAndEvent model' msg' ->
+            -- no one to notify, ignore instead
+            ( model', Cmd.none )

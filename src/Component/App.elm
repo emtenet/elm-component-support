@@ -2,9 +2,15 @@ module Component.App exposing (program, beginnerProgram)
 
 {-| These functions help you define a `main` value as required by all Elm applications.
 
-# Create a Program
+@docs program, beginnerProgram
+-}
 
-Your main elm file will likely contain something like this:
+import Html exposing (Html)
+import Html.App
+import Component.Update as Update
+
+
+{-| Your main elm file will likely contain something like this:
 
     import TopLevelComponent
 
@@ -15,33 +21,7 @@ Your main elm file will likely contain something like this:
         , update = TopLevelComponent.update
         , subscriptions = TopLevelComponent.subscriptions
         }
-
-@docs program
-
-# Create a Beginner Program
-
-If you have no need for commands or subscriptions then you can use this
-simpler function, something like this:
-
-    import TopLevelComponent
-
-    main =
-      Update.App.beginnerProgram
-        { init = TopLevelComponent.init
-        , view = TopLevelComponent.view
-        , update = TopLevelComponent.update
-        }
-
-@docs beginnerProgram
-
 -}
-
-import Html exposing (Html)
-import Html.App
-import Component.Update as Update
-
-
-{-|-}
 program :
     { init : model
     , update : msg -> model -> Update.Action msg model
@@ -58,7 +38,18 @@ program with =
         }
 
 
-{-|-}
+{-| If you have no need for commands or subscriptions then you can use this
+simpler function, something like this:
+
+    import TopLevelComponent
+
+    main =
+      Update.App.beginnerProgram
+        { init = TopLevelComponent.init
+        , view = TopLevelComponent.view
+        , update = TopLevelComponent.update
+        }
+-}
 beginnerProgram :
     { init : model
     , update : msg -> model -> Update.Action msg model
