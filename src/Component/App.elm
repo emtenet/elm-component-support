@@ -55,7 +55,7 @@ import Component.Update as Update
 -}
 program :
     { init : model
-    , update : msg -> model -> Update.Action msg model
+    , update : msg -> model -> Update.Action msg model Never
     , view : (msg -> msg) -> model -> Html msg
     , subscriptions : (msg -> msg) -> model -> Sub msg
     }
@@ -83,7 +83,7 @@ simpler function, something like this:
 -}
 beginnerProgram :
     { init : model
-    , update : msg -> model -> Update.Action msg model
+    , update : msg -> model -> Update.Action msg model Never
     , view : (msg -> msg) -> model -> Html msg
     }
     -> Program Never

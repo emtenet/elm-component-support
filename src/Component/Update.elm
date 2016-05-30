@@ -21,7 +21,11 @@ Component update functions have the following type signature:
 
     import Component.Update as Update
 
-    update : Msg -> Model -> Update.Action Msg Model
+    update : Msg -> Model -> Update.Action Msg Model msg'
+
+NOTE: The use of `msg'` (message-prime) to represent the parent component's
+message type in comparison with this component's general message type `msg`.
+This prime notation is also used to represent the parent component's model type `model'`.
 
 # Update actions
 
@@ -63,7 +67,7 @@ events back into your update function.
 
 {-| Represents the actions an update function may perform.
 -}
-type Action msg model
+type Action msg model msg'
     = Ignore
     | Cmd (Cmd.Cmd msg)
     | Msg msg
@@ -82,7 +86,7 @@ type Action msg model
 
 Useful as a placeholder until some update code is written.
 -}
-ignore : Action msg model
+ignore : Action msg model msg'
 ignore =
     Ignore
 
@@ -91,7 +95,7 @@ ignore =
 
     Update.cmd (WebSocket.send "ws://echo.websocket.org" "Message to be sent")
 -}
-cmd : Cmd.Cmd msg -> Action msg model
+cmd : Cmd.Cmd msg -> Action msg model msg'
 cmd =
     Cmd
 
@@ -112,7 +116,7 @@ Useful for renaming common events that come from multiple child components.
 
         ...
 -}
-msg : msg -> Action msg model
+msg : msg -> Action msg model msg'
 msg =
     Msg
 
@@ -143,7 +147,7 @@ event messages returned to the parent component.
             ClickEvent ->
                 Update.eventIgnored
 -}
-event : msg -> Action msg model
+event : msg -> Action msg model msg'
 event =
     Event
 
@@ -154,7 +158,7 @@ it back to your component.
 
 See above example for `event`.
 -}
-eventIgnored : Action msg model
+eventIgnored : Action msg model msg'
 eventIgnored =
     Ignore
 
@@ -166,7 +170,7 @@ eventIgnored =
             Update.model { model | counter = model.counter + 1 }
 
 -}
-model : model -> Action msg model
+model : model -> Action msg model msg'
 model =
     Model
 
@@ -175,7 +179,7 @@ model =
 
 See `model` and `event` for usage suggestions.
 -}
-modelAndEvent : model -> msg -> Action msg model
+modelAndEvent : model -> msg -> Action msg model msg'
 modelAndEvent =
     ModelAndEvent
 
@@ -198,7 +202,7 @@ modelAndEvent =
         , bottom : Counter.Model
         }
 
-    update : Msg -> Model -> Update.Action Msg Model
+    update : Msg -> Model -> Update.Action Msg Model msg'
     update msg' model =
         case msg' of
             Top msg ->
@@ -212,8 +216,8 @@ component :
     -> model
     -> (msg -> msg')
     -> (model -> model')
-    -> (msg -> model -> Action msg model)
-    -> Action msg' model'
+    -> (msg -> model -> Action msg model msg')
+    -> Action msg' model' msg''
 component msg model tag wrap update =
     componentFold msg model False tag wrap update
 
@@ -224,8 +228,8 @@ componentFold :
     -> Bool
     -> (msg -> msg')
     -> (model -> model')
-    -> (msg -> model -> Action msg model)
-    -> Action msg' model'
+    -> (msg -> model -> Action msg model msg')
+    -> Action msg' model' msg''
 componentFold msg model updated tag wrap update =
     case update msg model of
         Ignore ->
@@ -277,7 +281,7 @@ componentFold msg model updated tag wrap update =
         { counters : List ( Int, Counter.Model )
         }
 
-    update : Msg -> Model -> Update.Action Msg Model
+    update : Msg -> Model -> Update.Action Msg Model msg'
     update msg' model =
         case msg' of
             Counter id msg ->
@@ -289,8 +293,8 @@ components :
     -> List ( id, model )
     -> (msg -> msg')
     -> (List ( id, model ) -> model')
-    -> (msg -> model -> Action msg model)
-    -> Action msg' model'
+    -> (msg -> model -> Action msg model msg')
+    -> Action msg' model' msg''
 components id msg models tag wrap update =
     case componentFindById id models of
         Nothing ->
@@ -338,20 +342,11 @@ componentReplaceById id models with =
 component update function to one suitable for `Html.App.program`.
 -}
 program :
-    (msg -> model -> Action msg model)
+    (msg -> model -> Action msg model Never)
     -> msg
     -> model
     -> ( model, Cmd msg )
 program update msg model =
-    programFold msg model update
-
-
-programFold :
-    msg
-    -> model
-    -> (msg -> model -> Action msg model)
-    -> ( model, Cmd msg )
-programFold msg model update =
     case update msg model of
         Ignore ->
             ( model, Cmd.none )
@@ -360,7 +355,7 @@ programFold msg model update =
             ( model, cmd )
 
         Msg msg' ->
-            programFold msg' model update
+            program update msg' model
 
         Event msg' ->
             -- no one to notify, ignore instead
@@ -373,7 +368,7 @@ programFold msg model update =
             ( model', cmd )
 
         ModelAndMsg model' msg' ->
-            programFold msg' model' update
+            program update msg' model'
 
         ModelAndEvent model' msg' ->
             -- no one to notify, ignore instead

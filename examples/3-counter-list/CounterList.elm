@@ -44,7 +44,7 @@ init =
 -- UPDATE
 
 
-update : Msg -> Model -> Update.Action Msg Model
+update : Msg -> Model -> Update.Action Msg Model msg'
 update msg' model =
     case msg' of
         Insert ->
