@@ -1,8 +1,10 @@
 module TextBox
     exposing
-        ( Msg(EnterPressed)
+        ( Msg
         , Model
+        , Option
         , init
+        , onEnter
         , text
         , textSetAs
         , textSetAsEmpty
@@ -25,41 +27,56 @@ type Msg
     | KeyPress Int
     | Focus
     | Blur
-      -- public messages
-    | EnterPressed
 
 
-type alias Model =
+type alias Model msg' =
     { id : String
     , focused : Bool
     , text : String
+    , onEnter : Maybe msg'
     }
 
 
-init : String -> Model
-init id =
-    initWithText id ""
+type Option msg'
+    = OnEnter msg'
 
 
-initWithText : String -> String -> Model
-initWithText id text =
-    { id = id
-    , focused = False
-    , text = text
-    }
+init : String -> List (Option msg') -> Model msg'
+init id options =
+    initOptions options
+        { id = id
+        , focused = False
+        , text = ""
+        , onEnter = Nothing
+        }
 
 
-text : Model -> String
+onEnter : msg' -> Option msg'
+onEnter =
+    OnEnter
+
+
+initOptions : List (Option msg') -> Model msg' -> Model msg'
+initOptions options model =
+    case options of
+        [] ->
+            model
+
+        (OnEnter msg) :: rest ->
+            initOptions rest { model | onEnter = Just msg }
+
+
+text : Model msg' -> String
 text model =
     model.text
 
 
-textSetAs : String -> Model -> Model
+textSetAs : String -> Model msg' -> Model msg'
 textSetAs text model =
     { model | text = text }
 
 
-textSetAsEmpty : Model -> Model
+textSetAsEmpty : Model msg' -> Model msg'
 textSetAsEmpty =
     textSetAs ""
 
@@ -68,7 +85,7 @@ textSetAsEmpty =
 -- UPDATE
 
 
-update : Msg -> Model -> Update.Action Msg Model msg'
+update : Msg -> Model msg' -> Update.Action Msg (Model msg') msg'
 update msg model =
     case msg of
         Text text ->
@@ -76,7 +93,7 @@ update msg model =
 
         KeyPress key ->
             if key == 13 then
-                Update.event EnterPressed
+                Update.returnMaybe model.onEnter
             else
                 Update.ignore
 
@@ -86,15 +103,12 @@ update msg model =
         Blur ->
             Update.model { model | focused = False }
 
-        EnterPressed ->
-            Update.eventIgnored
-
 
 
 -- VIEW
 
 
-view : (Msg -> msg) -> Model -> String -> Html msg
+view : (Msg -> msg) -> Model msg' -> String -> Html msg
 view tag model title =
     Html.div
         [ Html.Attributes.style
@@ -108,7 +122,7 @@ view tag model title =
         ]
 
 
-viewLabel : Model -> String -> Html msg
+viewLabel : Model msg' -> String -> Html msg
 viewLabel model title =
     Html.div
         [ Html.Attributes.style
@@ -123,7 +137,7 @@ viewLabel model title =
         ]
 
 
-viewInput : (Msg -> msg) -> Model -> Html msg
+viewInput : (Msg -> msg) -> Model msg' -> Html msg
 viewInput tag model =
     let
         onKeyPress tagger =
@@ -150,7 +164,7 @@ viewInput tag model =
             []
 
 
-viewUnderline : Model -> Html msg
+viewUnderline : Model msg' -> Html msg
 viewUnderline model =
     Html.div
         [ Html.Attributes.style

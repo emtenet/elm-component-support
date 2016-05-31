@@ -21,12 +21,13 @@ import Message
 
 type Msg
     = Sender Sender.Msg
-    | ReceiveMessage String
     | Message ID Message.Msg
+    | SendMessage String
+    | ReceiveMessage String
 
 
 type alias Model =
-    { sender : Sender.Model
+    { sender : Sender.Model Msg
     , messages : List ( ID, Message.Model )
     , nextID : ID
     }
@@ -38,7 +39,7 @@ type alias ID =
 
 init : Model
 init =
-    { sender = Sender.init
+    { sender = Sender.init SendMessage
     , messages = []
     , nextID = 0
     }
@@ -60,11 +61,14 @@ echoServer =
 update : Msg -> Model -> Update.Action Msg Model msg'
 update msg model =
     case msg of
-        Sender (Sender.SendMessage message) ->
-            Update.cmd (WebSocket.send echoServer message)
-
         Sender msg' ->
             Update.component msg' model.sender (Sender) (\x -> { model | sender = x }) Sender.update
+
+        Message id msg' ->
+            Update.components id msg' model.messages (Message id) (\x -> { model | messages = x }) Message.update
+
+        SendMessage message ->
+            Update.cmd (WebSocket.send echoServer message)
 
         ReceiveMessage text ->
             let
@@ -79,9 +83,6 @@ update msg model =
                         | messages = ( id, message ) :: model.messages
                         , nextID = model.nextID + 1
                     }
-
-        Message id msg' ->
-            Update.components id msg' model.messages (Message id) (\x -> { model | messages = x }) Message.update
 
 
 

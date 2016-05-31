@@ -1,6 +1,6 @@
 module SendMessage
     exposing
-        ( Msg(SendMessage)
+        ( Msg
         , Model
         , init
         , update
@@ -17,22 +17,23 @@ import TextBox
 
 
 type Msg
-    = Text TextBox.Msg
+    = Message TextBox.Msg
     | Send Button.Msg
     | SendClicked
-    | SendMessage String
 
 
-type alias Model =
-    { text : TextBox.Model
-    , send : Button.Model
+type alias Model msg' =
+    { message : TextBox.Model Msg
+    , send : Button.Model Msg
+    , onSend : String -> msg'
     }
 
 
-init : Model
-init =
-    { text = TextBox.init "message-text"
-    , send = Button.init
+init : (String -> msg') -> Model msg'
+init onSend =
+    { message = TextBox.init "message-text" [ TextBox.onEnter SendClicked ]
+    , send = Button.init SendClicked
+    , onSend = onSend
     }
 
 
@@ -40,41 +41,32 @@ init =
 -- UPDATE
 
 
-update : Msg -> Model -> Update.Action Msg Model msg'
+update : Msg -> Model msg' -> Update.Action Msg (Model msg') msg'
 update msg model =
     case msg of
-        Text (TextBox.EnterPressed) ->
-            Update.msg SendClicked
-
-        Text msg' ->
-            Update.component msg' model.text (Text) (\x -> { model | text = x }) TextBox.update
-
-        Send (Button.Clicked) ->
-            Update.msg SendClicked
+        Message msg' ->
+            Update.component msg' model.message (Message) (\x -> { model | message = x }) TextBox.update
 
         Send msg' ->
             Update.component msg' model.send (Send) (\x -> { model | send = x }) Button.update
 
         SendClicked ->
             let
-                text =
-                    TextBox.text model.text
+                message =
+                    TextBox.text model.message
             in
-                Update.modelAndEvent { model | text = TextBox.textSetAsEmpty model.text }
-                    (SendMessage text)
-
-        SendMessage _ ->
-            Update.eventIgnored
+                Update.modelAndReturn { model | message = TextBox.textSetAsEmpty model.message }
+                    (model.onSend message)
 
 
 
 -- VIEW
 
 
-view : (Msg -> msg) -> Model -> Html msg
+view : (Msg -> msg) -> Model msg' -> Html msg
 view tag model =
     div []
         [ Html.p [] [ Html.text "Type a message then press Enter or click Send" ]
-        , TextBox.view (tag << Text) model.text "Message to send"
+        , TextBox.view (tag << Message) model.message "Message to send"
         , Button.view (tag << Send) model.send "Send"
         ]

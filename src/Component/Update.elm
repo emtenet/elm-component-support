@@ -4,10 +4,10 @@ module Component.Update
         , ignore
         , cmd
         , msg
-        , event
-        , eventIgnored
         , model
-        , modelAndEvent
+        , modelAndReturn
+        , return
+        , returnMaybe
         , component
         , components
         , program
@@ -23,7 +23,7 @@ Component update functions have the following type signature:
 
     update : Msg -> Model -> Update.Action Msg Model msg'
 
-NOTE: The use of `msg'` (message-prime) to represent the parent component's
+NOTE: The use of `msg'` (message prime) to represent the parent component's
 message type in comparison with this component's general message type `msg`.
 This prime notation is also used to represent the parent component's model type `model'`.
 
@@ -33,8 +33,8 @@ Component update functions, on receipt of a message, can do a combination of:
 
     * Update the component's `model`,
     * Forward messages to a child `component` or list of `components`,
-    * Return an `event` to the parent component,
-    * Request a command (`cmd`) to be performed,
+    * Return a message to the parent component,
+    * Request a command (`cmd`) to be executed,
     * Inject an additional message (`msg`) through the update function, or
     * **ignore** the message.
 
@@ -42,17 +42,17 @@ Component update functions, on receipt of a message, can do a combination of:
 
 # Simple actions
 
-@docs ignore, model, event, eventIgnored, cmd, msg
+@docs ignore, model, return, returnMaybe, cmd, msg
 
 # Combinations of actions
 
-@docs modelAndEvent
+@docs modelAndReturn
 
 # Child components
 
 Messages addressed to components can be processed by calling `component` or
 `components`, these will process any child component's actions and feed any
-events back into your update function.
+returned messages back into your update function.
 
 @docs component, components
 
@@ -71,11 +71,11 @@ type Action msg model msg'
     = Ignore
     | Cmd (Cmd.Cmd msg)
     | Msg msg
-    | Event msg
     | Model model
     | ModelAndCmd model (Cmd.Cmd msg)
     | ModelAndMsg model msg
-    | ModelAndEvent model msg
+    | ModelAndReturn model msg'
+    | Return msg'
 
 
 
@@ -121,48 +121,6 @@ msg =
     Msg
 
 
-{-| Return an event to the parent component.
-
-Your `Msg` union type will be divided into private component messages and
-event messages returned to the parent component.
-
-    module Button exposing (Msg, init, update, view)
-
-    import Html
-    import Html.Events
-    import Component.Update as Update
-
-    type Msg
-        = Click
-        | ClickEvent
-
-    init = ()
-
-    update msg model =
-        case msg of
-            Click ->
-                -- start animations, check if enabled ...
-                Update.event ClickEvent
-
-            ClickEvent ->
-                Update.eventIgnored
--}
-event : msg -> Action msg model msg'
-event =
-    Event
-
-
-{-| Used to document that the message was an event intended for the parent
-component, but the parent component did not process the message and passed
-it back to your component.
-
-See above example for `event`.
--}
-eventIgnored : Action msg model msg'
-eventIgnored =
-    Ignore
-
-
 {-| Update the model
 
     case msg of
@@ -175,13 +133,42 @@ model =
     Model
 
 
-{-| Update the model and return an event to the parent component.
+{-| Update the model and return a message to the parent component.
 
-See `model` and `event` for usage suggestions.
+See `model` and `return` for usage suggestions.
 -}
-modelAndEvent : model -> msg -> Action msg model msg'
-modelAndEvent =
-    ModelAndEvent
+modelAndReturn : model -> msg' -> Action msg model msg'
+modelAndReturn =
+    ModelAndReturn
+
+
+{-| Return a message to the parent component.
+
+    Html.input [ Html.Events.onKeyPress (tag << KeyPress) ] []
+
+    case msg of
+        KeyPress key ->
+            if key == 13 then
+                Update.return EnterPressed
+            else
+                Update.ignore
+
+-}
+return : msg' -> Action msg model msg'
+return =
+    Return
+
+
+{-|
+-}
+returnMaybe : Maybe msg' -> Action msg model msg'
+returnMaybe maybe =
+    case maybe of
+        Just msg ->
+            Return msg
+
+        Nothing ->
+            Ignore
 
 
 
@@ -247,12 +234,6 @@ componentFold msg model updated tag wrap update =
         Msg msg' ->
             componentFold msg' model updated tag wrap update
 
-        Event msg' ->
-            if updated then
-                ModelAndMsg (wrap model) (tag msg')
-            else
-                Msg (tag msg')
-
         Model model' ->
             Model (wrap model')
 
@@ -262,8 +243,14 @@ componentFold msg model updated tag wrap update =
         ModelAndMsg model' msg' ->
             componentFold msg' model' True tag wrap update
 
-        ModelAndEvent model' msg' ->
-            ModelAndMsg (wrap model') (tag msg')
+        ModelAndReturn model' msg' ->
+            ModelAndMsg (wrap model') msg'
+
+        Return msg' ->
+            if updated then
+                ModelAndMsg (wrap model) msg'
+            else
+                Msg msg'
 
 
 
@@ -357,10 +344,6 @@ program update msg model =
         Msg msg' ->
             program update msg' model
 
-        Event msg' ->
-            -- no one to notify, ignore instead
-            ( model, Cmd.none )
-
         Model model' ->
             ( model', Cmd.none )
 
@@ -370,6 +353,10 @@ program update msg model =
         ModelAndMsg model' msg' ->
             program update msg' model'
 
-        ModelAndEvent model' msg' ->
+        ModelAndReturn model' msg' ->
             -- no one to notify, ignore instead
             ( model', Cmd.none )
+
+        Return msg' ->
+            -- no one to return to, ignore instead
+            ( model, Cmd.none )

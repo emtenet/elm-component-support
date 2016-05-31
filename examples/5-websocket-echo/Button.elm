@@ -1,4 +1,4 @@
-module Button exposing (Msg(Clicked), Model, init, update, view)
+module Button exposing (Msg, Model, init, update, view)
 
 import Html exposing (Html, button, text)
 import Html.App
@@ -12,25 +12,27 @@ import Component.Update as Update
 
 type Msg
     = Click
-      -- public messages
-    | Clicked
 
 
-type alias Model =
-    { disabled : Bool }
+type alias Model msg' =
+    { disabled : Bool
+    , onClick : msg'
+    }
 
 
-init : Model
-init =
-    { disabled = False }
+init : msg' -> Model msg'
+init onClick =
+    { disabled = False
+    , onClick = onClick
+    }
 
 
-enable : Model -> Model
+enable : Model msg' -> Model msg'
 enable model =
     { model | disabled = False }
 
 
-disable : Model -> Model
+disable : Model msg' -> Model msg'
 disable model =
     { model | disabled = True }
 
@@ -39,26 +41,23 @@ disable model =
 -- UPDATE
 
 
-update : Msg -> Model -> Update.Action Msg Model msg'
+update : Msg -> Model msg' -> Update.Action Msg (Model msg') msg'
 update msg model =
     case msg of
         Click ->
-            Update.event Clicked
-
-        Clicked ->
-            Update.eventIgnored
+            Update.return model.onClick
 
 
 
 -- VIEW
 
 
-view : (Msg -> msg) -> Model -> String -> Html msg
+view : (Msg -> msg) -> Model msg' -> String -> Html msg
 view tag model title =
     viewWithContent tag model [ text title ]
 
 
-viewWithContent : (Msg -> msg) -> Model -> List (Html msg) -> Html msg
+viewWithContent : (Msg -> msg) -> Model msg' -> List (Html msg) -> Html msg
 viewWithContent tag model content =
     let
         attributes =
